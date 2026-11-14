@@ -62,8 +62,6 @@ jobs:
 
       - name: Fetch OCR and speech models
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           $extras = Join-Path $env:GITHUB_WORKSPACE 'extras'
           New-Item -ItemType Directory -Force (Join-Path $extras 'ocr'), (Join-Path $extras 'whisper') | Out-Null
@@ -71,13 +69,20 @@ jobs:
           foreach ($m in 'text-detection.rten', 'text-recognition.rten') {
             Invoke-WebRequest "https://huggingface.co/Pieces/ocrs-mirror/resolve/main/$m" -OutFile (Join-Path $extras "ocr\$m")
           }
-          # whisper.cpp's Windows build (whisper-server and its DLLs) for Dictate.
-          gh release download $env:WHISPER_TAG -R ggml-org/whisper.cpp -p 'whisper-bin-x64.zip' -D $env:RUNNER_TEMP
-          Expand-Archive (Join-Path $env:RUNNER_TEMP 'whisper-bin-x64.zip') -DestinationPath (Join-Path $env:RUNNER_TEMP 'whisper')
-          $server = Get-ChildItem -Recurse (Join-Path $env:RUNNER_TEMP 'whisper') -Filter 'whisper-server.exe' | Select-Object -First 1
-          if (-not $server) { throw 'whisper-server.exe not in the whisper.cpp release' }
-          Copy-Item (Join-Path $server.DirectoryName 'whisper-server.exe') (Join-Path $extras 'whisper')
-          Copy-Item (Join-Path $server.DirectoryName '*.dll') (Join-Path $extras 'whisper')
+          # whisper.cpp's server for Dictate, built here: one .exe with the C runtime inside, for
+          # CPUs with AVX2 (not this runner's own CPU, which may have more).
+          git clone --depth 1 --branch $env:WHISPER_TAG https://github.com/ggml-org/whisper.cpp (Join-Path $env:RUNNER_TEMP 'whisper.cpp')
+          $src = Join-Path $env:RUNNER_TEMP 'whisper.cpp'
+          cmake -S $src -B (Join-Path $src 'build') -DWHISPER_BUILD_SERVER=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON `
+            -DBUILD_SHARED_LIBS=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+            -DGGML_NATIVE=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
+          if ($LASTEXITCODE -ne 0) { throw 'whisper.cpp configure failed' }
+          cmake --build (Join-Path $src 'build') --config Release --target whisper-server -j 4
+          if ($LASTEXITCODE -ne 0) { throw 'whisper.cpp build failed' }
+          $server = Get-ChildItem -Recurse (Join-Path $src 'build') -Filter 'whisper-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'whisper-server.exe was not built' }
+          Copy-Item $server.FullName (Join-Path $extras 'whisper')
+          Get-ChildItem $server.DirectoryName -Filter '*.dll' | Copy-Item -Destination (Join-Path $extras 'whisper')
           Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$env:WHISPER_MODEL" -OutFile (Join-Path $extras "whisper\$env:WHISPER_MODEL")
           Get-ChildItem -Recurse $extras | Format-Table FullName, Length
 
