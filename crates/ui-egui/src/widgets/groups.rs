@@ -201,6 +201,7 @@ fn group_icon(title: &str) -> &'static str {
         "Styles" => "styles",
         "Editing" => "find",
         "Voice" => "dictate",
+        "Sign" => "signature",
         "Tables" => "table",
         "Links" => "link",
         _ => "more",

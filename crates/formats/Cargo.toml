@@ -31,6 +31,12 @@ hmac = { workspace = true }
 getrandom = { workspace = true }
 zeroize = { workspace = true }
 miniz_oxide = { workspace = true }
+# Opening PDFs (Type and Writer): hayro reads and draws them (MIT OR Apache-2.0).
+hayro = { version = "0.7.0", default-features = false, features = ["embed-fonts", "embed-cmaps"] }
+hayro-syntax = "0.7.2"
+hayro-interpret = { version = "0.7.0", default-features = false, features = ["embed-fonts", "embed-cmaps"] }
+kurbo = { workspace = true }
+skrifa = { workspace = true }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 # The browser clock (`SystemTime::now()` panics on wasm32-unknown-unknown): ODT change dates.

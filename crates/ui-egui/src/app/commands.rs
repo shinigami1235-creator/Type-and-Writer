@@ -444,6 +444,21 @@ impl WordApp {
             }
             return;
         }
+        // Sign as PDF (Type and Writer): the PDF goes to the reader that signs it.
+        if let Some(path) = req.get("openExternal").and_then(Value::as_str) {
+            let purpose = req.get("purpose").and_then(Value::as_str).unwrap_or("");
+            let r = match &self.services.open_external {
+                Some(open) => open(path, purpose),
+                None => Err(crate::i18n::fmt(tl!("The PDF is saved at {path}. Open it in your PDF reader to sign it."), &[("path", path)])),
+            };
+            if let Err(e) = r {
+                crate::dictate_ui::notify(self.ctx.as_ref(), e);
+            }
+        }
+        // Home › Dictate (Type and Writer).
+        if let Some(what) = req.get("dictate").and_then(Value::as_str) {
+            crate::dictate_ui::request(self, what);
+        }
         // Ctrl+F: type straight into the Navigation pane's search box (#712).
         if req.get("focus").and_then(Value::as_str) == Some("navSearch") {
             self.nav_search_focus = true;
@@ -798,12 +813,11 @@ impl WordApp {
             // MCP get an error.
             "ui.makeDefaultApp" => {
                 return Some(Err(
-                    "making WordCraft the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
+                    "making Type and Writer the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
                         .into(),
                 ));
             }
             "ui.discord" => {
-                self.canvas.open_url = Some("https://discord.gg/artcraft".into());
                 json!({})
             }
             "ui.caretAnimation" => {
@@ -910,20 +924,20 @@ impl WordApp {
     /// command, so nothing programmatic (control channel, MCP, macros) can change system defaults.
     pub(crate) fn make_default_app(&mut self) -> Result<Value, String> {
         let Some(hook) = self.services.make_default_app.as_ref() else {
-            return Err("WordCraft can't change the default apps here; use your system's settings".into());
+            return Err("Type and Writer can't change the default apps here; use your system's settings".into());
         };
         match hook() {
             Ok(DefaultApp::SettingsOpened) => {
-                self.status(tl!("In Default apps, choose WordCraft for the document types you want it to open."));
+                self.status(tl!("In Default apps, choose Type and Writer for the document types you want it to open."));
                 Ok(json!({"settingsOpened": true}))
             }
             Ok(DefaultApp::MadeDefault) => {
-                self.status(tl!("WordCraft is now the default app for Word documents."));
+                self.status(tl!("Type and Writer is now the default app for Word documents."));
                 Ok(json!({"default": true}))
             }
             Err(e) => {
                 log::warn!("make default app: {e}");
-                let msg = i18n::fmt(tl!("Couldn't make WordCraft the default: {error}"), &[("error", &e)]);
+                let msg = i18n::fmt(tl!("Couldn't make Type and Writer the default: {error}"), &[("error", &e)]);
                 self.status(msg.clone());
                 Err(msg)
             }

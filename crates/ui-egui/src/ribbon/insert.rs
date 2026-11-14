@@ -194,6 +194,10 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
             small(ui, app, "object", None, "Object", crate::widgets::ButtonAction::new("insert.object", json!({}), false));
         });
     });
+    // Type and Writer: the document as a PDF, opened in the reader that signs it.
+    group(ui, "Sign", None, app, |ui, app| {
+        big(ui, app, "signature", "Sign as\nPDF", "file.signAsPdf", json!({}), false);
+    });
     group(ui, "Symbols", None, app, |ui, app| {
         crate::equation_tab::insert_button(ui, app);
         menu_button(ui, app, crate::widgets::MenuButtonOptions::new("symbol", Some("Symbol"), "Symbol", true, "insert.symbol"), |ui, app| {

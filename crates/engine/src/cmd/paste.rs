@@ -25,8 +25,9 @@ pub const MAX_PICTURE_BYTES: usize = 96 << 20;
 const MAX_DEPTH: usize = 64;
 
 /// The formats, in the order the dialog lists them: (id, label).
-pub const FORMATS: [(&str, &str); 5] = [
+pub const FORMATS: [(&str, &str); 6] = [
     ("formatted", "Formatted Text"),
+    ("markdown", "Text from an AI chat (Markdown)"),
     ("rtf", "Rich Text Format (RTF)"),
     ("html", "HTML Format"),
     ("picture", "Picture"),
@@ -81,6 +82,7 @@ fn source(s: &Session, v: &Value, fmt: &str) -> Option<String> {
         "rtf" => p::str(v, "rtf").map(str::to_string).or_else(|| clip_text(s, v).filter(|t| looks_like_rtf(t))).and_then(non_empty),
         "html" => p::str(v, "html").map(str::to_string).or_else(|| clip_text(s, v).filter(|t| looks_like_html(t))).and_then(non_empty),
         "picture" => p::str(v, "picture").map(str::to_string).and_then(non_empty),
+        "markdown" => clip_text(s, v).filter(|t| looks_like_markdown(t)).and_then(non_empty),
         "text" => clip_text(s, v).and_then(non_empty),
         _ => None,
     }
@@ -128,7 +130,8 @@ fn paste_special(s: &mut Session, v: &Value) -> CmdResult {
         "html" => "html",
         "picture" | "png" | "image" => "picture",
         "text" | "unformatted" | "plain" => "text",
-        other => return Err(CmdError::Params(format!("unknown format `{other}` (formatted, rtf, html, picture or text)"))),
+        "markdown" | "md" | "chat" => "markdown",
+        other => return Err(CmdError::Params(format!("unknown format `{other}` (formatted, markdown, rtf, html, picture or text)"))),
     };
     let Some(src) = source(s, v, fmt) else {
         return Err(CmdError::Failed(if ids.is_empty() {
@@ -151,6 +154,7 @@ fn paste_special(s: &mut Session, v: &Value) -> CmdResult {
         }
         "formatted" => s.clipboard.clone().ok_or_else(|| CmdError::Failed("the clipboard is empty".into()))?,
         "html" => adopt(s, import_html(&src)),
+        "markdown" => markdown_fragment(s, &src),
         _ => adopt(s, wordcraft_formats::rtf::import(src.as_bytes()).map_err(|e| CmdError::Failed(format!("bad RTF: {e}")))?),
     };
     insert(s, frag)?;
@@ -293,6 +297,9 @@ pub fn paste_content(s: &mut Session, v: &Value) -> Result<Pasted, CmdError> {
         return Ok(Pasted::Fragment(f));
     }
     match text {
+        // Text copied from an AI chat (Claude, ChatGPT…) is Markdown: its headings, lists,
+        // tables, bold and italic come in as such instead of as `#`, `**` and `|`.
+        Some(t) if looks_like_markdown(&t) && t.len() <= MAX_PASTE_BYTES => Ok(Pasted::Fragment(markdown_fragment(s, &t))),
         Some(t) if !t.is_empty() => Ok(Pasted::Text(t)),
         _ => Err(CmdError::Failed("the clipboard is empty".into())),
     }
@@ -432,6 +439,51 @@ pub(crate) fn unlink_sections(blocks: &mut [Block]) {
 
 /// Turn an imported document into a fragment of the session's document: bring over the media,
 /// lists and styles it refers to (renumbered so they can't collide with ours).
+/// Does plain text read as Markdown, the way AI chats copy their answers? It takes a heading,
+/// table, fenced code or two kinds of list or emphasis marks, so ordinary text with a stray `*`
+/// or a line starting with a dash stays text.
+pub fn looks_like_markdown(t: &str) -> bool {
+    let lines: Vec<&str> = t.lines().take(2000).collect();
+    if lines.len() < 2 && !t.contains("**") {
+        return false;
+    }
+    let trimmed = |l: &str| l.trim_start().to_string();
+    let heading = lines.iter().any(|l| {
+        let l = l.trim_start();
+        let hashes = l.chars().take_while(|&c| c == '#').count();
+        (1..=6).contains(&hashes) && l[hashes..].starts_with(' ') && l.len() > hashes + 1
+    });
+    let table = lines.windows(2).any(|w| {
+        let sep = w[1].trim();
+        w[0].trim_start().starts_with('|') && sep.starts_with('|') && sep.contains("--") && sep.chars().all(|c| "|-: ".contains(c))
+    });
+    let fence = lines.iter().filter(|l| l.trim_start().starts_with("```")).count() >= 2;
+    let bullets = lines.iter().map(|l| trimmed(l)).filter(|l| l.starts_with("- ") || l.starts_with("* ") || l.starts_with("+ ")).count();
+    let numbered = lines
+        .iter()
+        .map(|l| trimmed(l))
+        .filter(|l| {
+            let d = l.chars().take_while(char::is_ascii_digit).count();
+            (1..=3).contains(&d) && l[d..].starts_with(". ")
+        })
+        .count();
+    let bold = t.matches("**").count() >= 2;
+    let quote = lines.iter().filter(|l| l.starts_with("> ")).count() >= 1;
+    let code = t.matches('`').count() >= 2;
+    if heading || table || fence {
+        return true;
+    }
+    let signals = [bullets >= 2, numbered >= 2, bold, quote, code].iter().filter(|&&b| b).count();
+    signals >= 2 || (bold && lines.len() <= 3)
+}
+
+/// Markdown text as a fragment in this document's look: its structure (headings, lists,
+/// tables, quotes, code) and emphasis come in; fonts and sizes are the document's.
+fn markdown_fragment(s: &mut Session, text: &str) -> Fragment {
+    let doc = wordcraft_formats::markdown::import(text);
+    adopt(s, doc)
+}
+
 fn adopt(s: &mut Session, src: Document) -> Fragment {
     let mut frag = s.doc.adopt(src);
     // Pasted pictures fit our text width, like Insert › Pictures (layout keeps their size).
@@ -441,4 +493,26 @@ fn adopt(s: &mut Session, src: Document) -> Fragment {
     }
     unlink_sections(&mut frag.blocks);
     frag
+}
+
+#[cfg(test)]
+mod chat_paste_tests {
+    use super::looks_like_markdown;
+
+    #[test]
+    fn chat_answers_read_as_markdown() {
+        assert!(looks_like_markdown("## Plan\n\nWe start Monday."));
+        assert!(looks_like_markdown("| Item | Cost |\n|---|---|\n| Gloves | 120 |"));
+        assert!(looks_like_markdown("Steps:\n- **Clean** the area\n- Apply the cream"));
+        assert!(looks_like_markdown("Use `cargo build` then:\n1. run it\n2. check it"));
+        assert!(looks_like_markdown("This is **important**."));
+    }
+
+    #[test]
+    fn plain_text_stays_text() {
+        assert!(!looks_like_markdown("Dear Gid,\nThanks for the call.\nRegards"));
+        assert!(!looks_like_markdown("- one dash line\nand more text"));
+        assert!(!looks_like_markdown("5 * 3 = 15\n2 * 4 = 8"));
+        assert!(!looks_like_markdown("#hashtag at the start\nsecond line"));
+    }
 }

@@ -274,7 +274,7 @@ impl WordApp {
             .as_ref()
             .and_then(|p| p.extension())
             .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("doc") || e.eq_ignore_ascii_case("dot"))
+            .is_some_and(|e| e.eq_ignore_ascii_case("doc") || e.eq_ignore_ascii_case("dot") || e.eq_ignore_ascii_case("pdf"))
     }
 
     /// The name a browser Save or Export without a name uses. An export is named after the

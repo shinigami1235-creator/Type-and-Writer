@@ -17,6 +17,8 @@ mod apple_events;
 mod clipboard;
 mod control_server;
 mod default_apps;
+mod dictation;
+mod external;
 mod file_dialogs;
 #[cfg(any(target_os = "windows", target_os = "macos", test))]
 mod graphics;
@@ -389,6 +391,11 @@ fn services(file_dialog: file_dialogs::Hook, cancel_file_dialog: file_dialogs::C
         clipboard_rtf: Some(Box::new(clipboard::rtf)),
         clipboard_formats: Some(Box::new(clipboard::formats)),
         save_prefs: Some(Box::new(try_save_prefs)),
+        open_external: Some(Box::new(external::open)),
+        dictation: Some(Box::new(dictation::Desktop::new({
+            let ctx = ctx.clone();
+            std::sync::Arc::new(move || ctx.request_repaint())
+        }))),
         ..Default::default()
     }
 }
@@ -403,7 +410,7 @@ fn app_icon() -> Option<egui::IconData> {
 }
 
 const USAGE: &str = "\
-wordcraft — the WordCraft desktop app
+wordcraft — the Type and Writer desktop app
 
 USAGE:
   wordcraft [--sample] [--control PORT] [FILE…]
@@ -491,6 +498,11 @@ fn main() -> eframe::Result {
     if let Some(result) = craft_update::self_update::finish(&wordcraft_ui_egui::UPDATE_APP, &std::env::args_os().skip(1).collect::<Vec<_>>()) {
         std::process::exit(i32::from(result.is_err()));
     }
+    // Type and Writer: scanned PDFs are read with OCR, and every save is kept in version history.
+    wordcraft_ocr::install();
+    if let Some(dir) = wordcraft_control_key::settings_dir() {
+        wordcraft_engine::history::set_root(dir.join("history"));
+    }
     // Linux: before anything reads another program's AppImage variables, or a thread starts (#5653).
     #[cfg(target_os = "linux")]
     let start_over_failed = appimage_env::drop_inherited();
@@ -551,7 +563,7 @@ fn main() -> eframe::Result {
     if let Some(logger) = logger {
         match log_dir().filter(|_| prefs_enabled()) {
             Some(dir) => match logger.attach_dir(&dir) {
-                Ok(path) => log::info!("WordCraft {} ({}), log file {}", env!("CARGO_PKG_VERSION"), build_sha(), path.display()),
+                Ok(path) => log::info!("Type and Writer {} ({}), log file {}", env!("CARGO_PKG_VERSION"), build_sha(), path.display()),
                 // Standard error only by now (`attach_dir` gave up on the file); unlike `eprintln!`, never panics.
                 Err(e) => log::warn!("no log file: {e}"),
             },
@@ -560,7 +572,7 @@ fn main() -> eframe::Result {
     }
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("WordCraft")
+            .with_title("Type and Writer")
             .with_app_id("ai.storyteller.wordcraft")
             .with_inner_size([1440.0, 920.0])
             .with_min_inner_size([760.0, 480.0])
@@ -608,7 +620,7 @@ fn main() -> eframe::Result {
     #[cfg(target_os = "macos")]
     let apple_events = &apple_events;
     eframe::run_native(
-        "WordCraft",
+        "Type and Writer",
         options,
         Box::new(move |cc| {
             // The system region picks the new document's paper, the units and the decimal
@@ -620,7 +632,7 @@ fn main() -> eframe::Result {
             let mut session = Session::new(doc);
             session.system_region = region;
             let mut app = WordApp::new(session, services(file_dialog, cancel_file_dialog, &cc.egui_ctx));
-            app.set_startup_update_check(true);
+            // No update check at start: Type and Writer is updated by its own installer.
             load_prefs(&mut app);
             // After the preferences, so the reason it gives is in the interface language.
             if updates_unsafe {
@@ -653,6 +665,11 @@ fn main() -> eframe::Result {
                 app.mac_titlebar = bar;
             }
             let mut key_file = None;
+            // Type and Writer: the control channel is always on at 7981 (this computer only, with
+            // the key in the settings folder), so Claude's extension finds the open window. A
+            // second window, or TYPE_AND_WRITER_NO_CLAUDE_LINK, leaves it off.
+            let asked_control = control_port.is_some();
+            let control_port = control_port.or_else(|| std::env::var_os("TYPE_AND_WRITER_NO_CLAUDE_LINK").is_none().then_some(7981));
             if let Some(port) = control_port
                 && let Some((rx, file)) = control_server::start(port, cc.egui_ctx.clone(), wordcraft_control_key::settings_dir().as_deref())
             {
@@ -662,7 +679,7 @@ fn main() -> eframe::Result {
             // Nothing to open (no files, no sample, no control channel driving the editor): start
             // on File › Home, as Word does (#766), unless the Start screen option is off. Files
             // macOS hands over later open on top of it and close it (`apple_events`).
-            if files.is_empty() && other_files.is_empty() && !sample && control_port.is_none() {
+            if files.is_empty() && other_files.is_empty() && !sample && !asked_control {
                 app.start_screen();
             }
             // A Word template named here starts a new document based on it (#3433).

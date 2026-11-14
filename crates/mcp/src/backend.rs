@@ -38,6 +38,8 @@ pub struct Remote {
     /// The control key, looked up once per connection (the app picks a new one at every start).
     key: Option<String>,
     find_key: KeyFinder,
+    /// The app to start when it isn't running (Type and Writer's Claude extension).
+    launch: Option<std::path::PathBuf>,
 }
 
 /// The control key: `env` (`WORDCRAFT_CONTROL_KEY`) when set, else the app's key file for
@@ -111,7 +113,7 @@ impl Remote {
     }
 
     fn connect_with(addr: &str, find_key: KeyFinder) -> std::io::Result<Self> {
-        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1, connected: false, send_key: false, key: None, find_key };
+        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1, connected: false, send_key: false, key: None, find_key, launch: None };
         r.reconnect()?;
         if let Some(w) = r.key_warning() {
             log::warn!("{w}");
@@ -122,7 +124,46 @@ impl Remote {
     /// A remote that connects on first use: the app may start after the MCP server, and a
     /// server that exits at once reads as failed for the client's whole session (#4078).
     pub fn lazy(addr: &str) -> Self {
-        Self { addr: addr.to_string(), conn: None, next_id: 1, connected: false, send_key: false, key: None, find_key: Box::new(find_key) }
+        Self {
+            addr: addr.to_string(),
+            conn: None,
+            next_id: 1,
+            connected: false,
+            send_key: false,
+            key: None,
+            find_key: Box::new(find_key),
+            launch: None,
+        }
+    }
+
+    /// Start `program` (Type and Writer) with its control channel on this address's port when
+    /// the app isn't running, then wait for it, so an agent's first call opens the app.
+    pub fn with_launch(mut self, program: std::path::PathBuf) -> Self {
+        self.launch = Some(program);
+        self
+    }
+
+    /// The app isn't answering: start it (once per failure) and wait up to 30 s for its port.
+    fn launch_app(&mut self) -> std::io::Result<()> {
+        let Some(program) = self.launch.clone() else {
+            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "no program to start"));
+        };
+        let port = self.addr.rsplit_once(':').map(|(_, p)| p.to_string()).unwrap_or_else(|| "7981".into());
+        std::process::Command::new(&program)
+            .args(["--control", &port])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
+        let until = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            std::thread::sleep(Duration::from_millis(400));
+            match self.reconnect() {
+                Ok(()) => return Ok(()),
+                Err(e) if std::time::Instant::now() > until => return Err(e),
+                Err(_) => {}
+            }
+        }
     }
 
     /// The address the app is reached at, as given.
@@ -209,11 +250,15 @@ impl Remote {
     ) -> Result<Value, String> {
         let unreachable = |addr: &str, e: std::io::Error, connected: bool| {
             let retry = if connected { String::new() } else { "; will retry on each call".to_string() };
-            format!("WordCraft app at {addr} is not reachable: {e}{retry}")
+            format!("Type and Writer app at {addr} is not reachable: {e}{retry}")
         };
         let mut first = true;
         let reply = loop {
-            let tried = if self.conn.is_some() { Ok(()) } else { self.reconnect().map_err(Failure::NotSent) };
+            let tried = if self.conn.is_some() {
+                Ok(())
+            } else {
+                self.reconnect().or_else(|e| if self.launch.is_some() && first { self.launch_app() } else { Err(e) }).map_err(Failure::NotSent)
+            };
             let result = match tried {
                 Ok(()) => {
                     let line = self.request_line(id, method, params)?;
@@ -236,7 +281,7 @@ impl Remote {
                         && !is_read_only(method, params)
                     {
                         return Err(format!(
-                            "outcome unknown: the connection to the WordCraft app at {} failed while sending `{method}` or waiting for its reply ({e}); it may have been executed, so it is not sent again. Inspect the document to check",
+                            "outcome unknown: the connection to the Type and Writer app at {} failed while sending `{method}` or waiting for its reply ({e}); it may have been executed, so it is not sent again. Inspect the document to check",
                             self.addr
                         ));
                     }
@@ -308,7 +353,7 @@ impl Backend for Remote {
             Err(self.key_warning().map_or_else(
                 || {
                     format!(
-                        "unauthorized: the WordCraft app at {} refused the control key (from WORDCRAFT_CONTROL_KEY or the app's key file)",
+                        "unauthorized: the Type and Writer app at {} refused the control key (from WORDCRAFT_CONTROL_KEY or the app's key file)",
                         self.addr
                     )
                 },
@@ -325,9 +370,9 @@ impl Backend for Remote {
 
     fn describe(&self) -> String {
         if self.connected {
-            format!("connected to the WordCraft app at {}", self.addr)
+            format!("connected to the Type and Writer app at {}", self.addr)
         } else {
-            format!("will connect to the WordCraft app at {} when it opens", self.addr)
+            format!("will connect to the Type and Writer app at {} when it opens", self.addr)
         }
     }
 }

@@ -18,6 +18,19 @@ use std::sync::Arc;
 /// markup, editor and selection commands; and design and view options.
 pub fn specs() -> Vec<CommandSpec> {
     vec![
+        // Dictate (Type and Writer): the desktop app listens at the microphone and types what it
+        // hears at the caret. Headless sessions have no microphone; the request goes nowhere.
+        CommandSpec::new("tools.dictate", "Dictate", "Home › Voice", |s, v| {
+            let what = match p::bool(v, "on") {
+                Some(true) => "start",
+                Some(false) => "stop",
+                None => "toggle",
+            };
+            s.push_ui_request(json!({"dictate": what}));
+            Ok(json!({"dictate": what}))
+        })
+        .params(r#"{"on"?: bool (start or stop; omitted: switch)}"#)
+        .pure(),
         CommandSpec::new("edit.repeat", "Repeat", "Quick Access Toolbar", |s, _| {
             let Some((id, params)) = s.last_command.clone() else { return Err(CmdError::Failed("nothing to repeat".into())) };
             s.run(&id, &params)

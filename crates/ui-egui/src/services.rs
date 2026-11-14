@@ -1,9 +1,27 @@
 use super::state::DefaultApp;
 use super::{FileDialogAnswer, FileDialogRequest, WordApp, async_saves, paste_picture, printing, system_clipboard};
 
+/// Dictation (Type and Writer): speech heard at the microphone, written down by a speech model
+/// on the computer. The desktop app supplies it; Home › Dictate turns it on and off.
+pub trait Dictation {
+    /// Start listening. An error says why it can't (no microphone, no speech model).
+    fn start(&mut self) -> Result<(), String>;
+    fn stop(&mut self);
+    fn listening(&self) -> bool;
+    /// What was said since the last call, a phrase at a time.
+    fn take_text(&mut self) -> Vec<String>;
+    /// A problem met while listening, to show once.
+    fn take_error(&mut self) -> Option<String>;
+}
+
 /// Platform services injected by the host (file dialogs, file I/O).
 #[derive(Default)]
 pub struct Services {
+    /// Desktop: Dictate (Home › Voice).
+    pub dictation: Option<Box<dyn Dictation>>,
+    /// Desktop: open a file in another program (`purpose` "sign": the PDF reader set for
+    /// signing, else the computer's own app for the file).
+    pub open_external: Option<Box<dyn Fn(&str, &str) -> Result<(), String>>>,
     /// Desktop: discover configured printers on a worker.
     pub printers: Option<printing::Discover>,
     /// Desktop: submit the PDF with the chosen settings on a worker.

@@ -216,6 +216,12 @@ pub enum Dialog {
     WordCount {
         stats: Value,
     },
+    /// File › Info › Version History (Type and Writer): the copies every save keeps.
+    VersionHistory {
+        list: Value,
+        picked: Option<String>,
+        message: Option<String>,
+    },
     Zoom {
         percent: f32,
     },
@@ -516,6 +522,7 @@ impl Dialog {
             Dialog::Link { .. } => "link",
             Dialog::Bookmark { .. } => "bookmark",
             Dialog::WordCount { .. } => "wordCount",
+            Dialog::VersionHistory { .. } => "versionHistory",
             Dialog::Zoom { .. } => "zoom",
             Dialog::Watermark { .. } => "watermark",
             Dialog::Phonetic { .. } => "phonetic",
@@ -740,6 +747,11 @@ impl Dialog {
             }
             "bookmark" => Dialog::Bookmark { name: bookmark_at_caret(&app.session), by_location: false, hidden: false, deleted: false },
             "wordCount" => Dialog::WordCount { stats: app.session.run("review.wordCount", &json!({})).unwrap_or_default() },
+            "versionHistory" => Dialog::VersionHistory {
+                list: app.session.run("file.versionHistory", &json!({"quiet": true})).unwrap_or_default(),
+                picked: None,
+                message: None,
+            },
             "zoom" => Dialog::Zoom { percent: (app.session.view.zoom * 100.0).round() },
             "watermark" => Dialog::Watermark { text: "CONFIDENTIAL".into(), diagonal: true },
             "phonetic" => {

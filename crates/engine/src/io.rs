@@ -3,6 +3,7 @@
 use wordcraft_doc::Document;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub mod history;
 mod safe_save;
 
 /// Formats WordCraft opens.
@@ -13,6 +14,7 @@ pub const OPEN_EXTS: &[&str] = &[
     "dotm",
     "doc",
     "dot",
+    "pdf",
     "txt",
     "md",
     "markdown",
@@ -415,11 +417,14 @@ fn open_by_content(
 ) -> Result<(Document, bool), String> {
     let (mut doc, encrypted) = if bytes.starts_with(OLE_SIG) && wordcraft_docx::is_encrypted(bytes) {
         (read_docx(bytes, password).map_err(|e| e.to_string())?, true)
+    } else if bytes.get(..1024).unwrap_or(bytes).windows(5).any(|w| w == b"%PDF-") {
+        (wordcraft_formats::pdf::import(bytes)?, false)
     } else if bytes.starts_with(ZIP_SIG) {
-        (read_docx(bytes, None).map_err(|e| format!("{name}: not a document WordCraft can open ({e})"))?, false)
+        (read_docx(bytes, None).map_err(|e| format!("{name}: not a document Type and Writer can open ({e})"))?, false)
     } else if bytes.starts_with(OLE_SIG) {
-        open_binary_doc(bytes, password)
-            .map_err(|e| if needs_password(&e) || wrong_password(&e) { e } else { format!("{name}: not a document WordCraft can open ({e})") })?
+        open_binary_doc(bytes, password).map_err(|e| {
+            if needs_password(&e) || wrong_password(&e) { e } else { format!("{name}: not a document Type and Writer can open ({e})") }
+        })?
     } else if bytes.starts_with(b"{\\rtf") {
         (wordcraft_formats::rtf::import(bytes)?, false)
     } else if is_word_xml(bytes) {
@@ -433,7 +438,7 @@ fn open_by_content(
     } else if wordcraft_formats::txt::is_text(bytes) {
         (wordcraft_formats::txt::import_on(bytes, page), false)
     } else if ext.is_empty() {
-        return Err(format!("{name}: not a document or text file WordCraft can open"));
+        return Err(format!("{name}: not a document or text file Type and Writer can open"));
     } else {
         return Err(format!("{name}: unsupported format `.{ext}` (not a document or text file)"));
     };

@@ -1,0 +1,28 @@
+{
+  "manifest_version": "0.3",
+  "name": "type-and-writer",
+  "display_name": "Type and Writer",
+  "version": "0.18.1",
+  "description": "Lets Claude write and edit documents in Type and Writer: open, type, format, review, save, export PDFs, and see the window.",
+  "long_description": "Connects Claude to Type and Writer, the Cygnus Solutions word processor. Claude works in the app's window: it can open and save documents, type and format text, run any of the app's commands, track changes and take screenshots of the page. If Type and Writer isn't open, the first request opens it.",
+  "author": { "name": "Cygnus Solutions" },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/type-and-writer-mcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/type-and-writer-mcp.exe",
+      "args": ["mcp", "--connect", "127.0.0.1:7981", "--launch", "${user_config.app_path}"]
+    }
+  },
+  "user_config": {
+    "app_path": {
+      "type": "file",
+      "title": "Type and Writer program",
+      "description": "The Type and Writer program file (wordcraft.exe in its install folder). Claude opens it when it isn't running.",
+      "default": "${HOME}\\AppData\\Local\\Programs\\Cygnus Solutions\\Type and Writer\\wordcraft.exe",
+      "required": true
+    }
+  },
+  "compatibility": { "platforms": ["win32"] },
+  "license": "MIT OR Apache-2.0"
+}

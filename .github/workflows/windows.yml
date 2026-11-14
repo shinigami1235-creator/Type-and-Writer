@@ -1,0 +1,116 @@
+# Type and Writer for Windows: builds the installer (MSI) and a portable zip with the OCR and
+# speech models beside the program, packages the Claude extension (.mcpb), and publishes them as
+# a GitHub release. Runs on every push to main and by hand (Actions › Windows › Run workflow).
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # Speech engine and models (versions pinned so a build is repeatable).
+  WHISPER_TAG: v1.9.5
+  WHISPER_MODEL: ggml-small.en-q5_1.bin
+  CRAFT_FONTS_REF: b076417b5880bd4154bd22f00695b1d28c6bea83
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out craft-fonts (bundled fonts)
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+
+      - name: Check out craft-i18n (languages, spelling and grammar data)
+        shell: bash
+        run: |
+          rev=$(tr -d '[:space:]' < craft-i18n.rev)
+          git clone --filter=blob:none https://github.com/storytold/craft-i18n craft-i18n
+          git -C craft-i18n checkout "$rev"
+          echo "CRAFT_I18N_DIR=$GITHUB_WORKSPACE/craft-i18n" >> "$GITHUB_ENV"
+          echo "CRAFT_I18N_REQUIRED=1" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: taw-windows-x64
+
+      - name: Install WiX
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+
+      - name: Fetch OCR and speech models
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $extras = Join-Path $env:GITHUB_WORKSPACE 'extras'
+          New-Item -ItemType Directory -Force (Join-Path $extras 'ocr'), (Join-Path $extras 'whisper') | Out-Null
+          # ocrs models (Robert Knight's ocrs-models), read by the PDF importer for scanned pages.
+          foreach ($m in 'text-detection.rten', 'text-recognition.rten') {
+            Invoke-WebRequest "https://huggingface.co/Pieces/ocrs-mirror/resolve/main/$m" -OutFile (Join-Path $extras "ocr\$m")
+          }
+          # whisper.cpp's Windows build (whisper-server and its DLLs) for Dictate.
+          gh release download $env:WHISPER_TAG -R ggml-org/whisper.cpp -p 'whisper-bin-x64.zip' -D $env:RUNNER_TEMP
+          Expand-Archive (Join-Path $env:RUNNER_TEMP 'whisper-bin-x64.zip') -DestinationPath (Join-Path $env:RUNNER_TEMP 'whisper')
+          $server = Get-ChildItem -Recurse (Join-Path $env:RUNNER_TEMP 'whisper') -Filter 'whisper-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'whisper-server.exe not in the whisper.cpp release' }
+          Copy-Item (Join-Path $server.DirectoryName 'whisper-server.exe') (Join-Path $extras 'whisper')
+          Copy-Item (Join-Path $server.DirectoryName '*.dll') (Join-Path $extras 'whisper')
+          Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$env:WHISPER_MODEL" -OutFile (Join-Path $extras "whisper\$env:WHISPER_MODEL")
+          Get-ChildItem -Recurse $extras | Format-Table FullName, Length
+
+      - name: Build and package
+        shell: pwsh
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
+          TAW_EXTRAS: ${{ github.workspace }}/extras
+        run: ./packaging/windows/package.ps1 -Arch x64
+
+      - name: Package the Claude extension
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'mcpb'
+          New-Item -ItemType Directory -Force (Join-Path $dir 'server') | Out-Null
+          Copy-Item packaging/windows/mcpb/manifest.json $dir
+          Copy-Item assets/app-icon/hicolor/256x256/apps/*.png (Join-Path $dir 'icon.png') -ErrorAction SilentlyContinue
+          Copy-Item target/x86_64-pc-windows-msvc/release/wordcraft-cli.exe (Join-Path $dir 'server\type-and-writer-mcp.exe')
+          $out = Join-Path $PWD 'dist/release/type-and-writer.zip'
+          Compress-Archive -Path (Join-Path $dir '*') -DestinationPath $out -Force
+          Move-Item $out (Join-Path $PWD 'dist/release/type-and-writer.mcpb') -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: type-and-writer-windows
+          path: dist/release/*
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${GITHUB_RUN_NUMBER}"
+          notes="Type and Writer build ${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7}. Install with the .msi; the .mcpb file adds Type and Writer to Claude (double-click it with the Claude desktop app open)."
+          gh release create "$tag" dist/release/* --title "Type and Writer (build ${GITHUB_RUN_NUMBER})" --notes "$notes" --target "$GITHUB_SHA" --latest

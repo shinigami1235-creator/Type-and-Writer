@@ -29,7 +29,7 @@ impl Default for Runtime {
     fn default() -> Self {
         Self {
             #[cfg(not(target_arch = "wasm32"))]
-            updater: Updater::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")).with_translator(translate),
+            updater: Updater::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")).with_translator(translate).with_source(own_installer_check()),
             #[cfg(not(target_arch = "wasm32"))]
             result_dialog: CheckResultDialog::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")).with_translator(translate),
             #[cfg(not(target_arch = "wasm32"))]
@@ -78,11 +78,20 @@ impl WordApp {
     }
 }
 
+/// Type and Writer is a fork: the upstream updater would download WordCraft builds over it, so the
+/// check never reaches the network and Help ▸ Check for Updates shows where to get the newest installer.
+#[cfg(not(target_arch = "wasm32"))]
+fn own_installer_check() -> craft_update::updater::CheckSource {
+    let why =
+        tl!("Type and Writer gets updates from its own installer. Download the newest one from the Cygnus Solutions releases page.").to_string();
+    std::sync::Arc::new(move || Err(why.clone()))
+}
+
 /// A check for updates that never finds one and gives the reason as its error, which Help ▸ Check
 /// for Updates shows.
 #[cfg(not(target_arch = "wasm32"))]
 fn refused_check() -> craft_update::updater::CheckSource {
-    let why = tl!("Updates are off in this window: WordCraft was started with another program's AppImage settings. Start WordCraft from its own menu entry to update it.")
+    let why = tl!("Updates are off in this window: Type and Writer was started with another program's AppImage settings. Start Type and Writer from its own menu entry to update it.")
         .to_string();
     std::sync::Arc::new(move || Err(why.clone()))
 }

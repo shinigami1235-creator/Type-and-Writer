@@ -26,6 +26,7 @@ pub(super) fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         Dialog::Link { .. } => link_dialog(app, ui, d),
         Dialog::Bookmark { name, by_location, hidden, deleted } => bookmark(app, ui, name, by_location, hidden, deleted),
         Dialog::WordCount { .. } => word_count_dialog(app, ui, d),
+        Dialog::VersionHistory { .. } => version_history_dialog(app, ui, d),
         Dialog::Zoom { .. } => zoom_dialog(app, ui, d),
         Dialog::Watermark { .. } => watermark_dialog(app, ui, d),
         Dialog::Phonetic { .. } => phonetic_dialog(app, ui, d),
@@ -837,6 +838,67 @@ fn word_count_dialog(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
     ok || cancel
 }
 
+/// The versions every save keeps, newest first. Open shows one beside the document; Compare
+/// opens a window with the changes since then as tracked changes; Restore puts it in place of
+/// the document (Undo takes it back).
+fn version_history_dialog(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
+    let Dialog::VersionHistory { list, picked, message } = d else {
+        return false;
+    };
+    let versions = list.get("versions").and_then(Value::as_array).cloned().unwrap_or_default();
+    if !list.get("on").and_then(Value::as_bool).unwrap_or(false) {
+        ui.label(tl!("Version history is off in this program."));
+    } else if !list.get("saved").and_then(Value::as_bool).unwrap_or(false) {
+        ui.label(tl!("Save the document once and every save after that is kept here."));
+    } else if versions.is_empty() {
+        ui.label(tl!("No earlier versions yet. Each save from now on is kept here."));
+    } else {
+        ui.label(tl!("Pick a save to open, compare with this document or restore."));
+        ui.add_space(4.0);
+        egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+            for v in &versions {
+                let id = v.get("id").and_then(Value::as_str).unwrap_or_default().to_string();
+                let when = v.get("savedAt").and_then(Value::as_str).unwrap_or_default();
+                let kb = v.get("bytes").and_then(Value::as_u64).unwrap_or(0).div_ceil(1024);
+                let sel = picked.as_deref() == Some(id.as_str());
+                if ui.selectable_label(sel, format!("{when}    {kb} KB")).clicked() {
+                    *picked = Some(id);
+                }
+            }
+        });
+    }
+    if let Some(m) = message.as_deref() {
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(m).small());
+    }
+    ui.add_space(6.0);
+    let mut close = false;
+    ui.horizontal(|ui| {
+        let chosen = picked.clone();
+        let enabled = chosen.is_some();
+        let act = |cmd: &str, app: &mut WordApp| -> Option<String> {
+            let id = chosen.clone()?;
+            app.run(cmd, json!({"id": id})).err()
+        };
+        if ui.add_enabled(enabled, egui::Button::new(tl!("Open"))).clicked() {
+            *message = act("file.openVersion", app);
+            close = message.is_none();
+        }
+        if ui.add_enabled(enabled, egui::Button::new(tl!("Compare"))).clicked() {
+            *message = act("file.compareVersion", app);
+            close = message.is_none();
+        }
+        if ui.add_enabled(enabled, egui::Button::new(tl!("Restore"))).clicked() {
+            *message = act("file.restoreVersion", app);
+            close = message.is_none();
+        }
+        if ui.button(tl!("Close")).clicked() {
+            close = true;
+        }
+    });
+    close
+}
+
 fn zoom_dialog(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
     let Dialog::Zoom { percent } = d else {
         return false;
@@ -1171,16 +1233,16 @@ fn about_dialog(ui: &mut Ui, d: &mut Dialog) -> bool {
         2 => crate::credits::models_ui(ui),
         3 => crate::language_packs::about_tab(ui),
         _ => {
-            ui.label(egui::RichText::new(tl!("WordCraft")).font(semibold(22.0)));
+            ui.label(egui::RichText::new(tl!("Type and Writer")).font(semibold(22.0)));
             let build = option_env!("WORDCRAFT_BUILD_SHA").map(|s| s.get(..8).unwrap_or(s)).unwrap_or(tl!("development build"));
             ui.label(crate::i18n::fmt(tl!("Version {version} ({build})"), &[("version", env!("CARGO_PKG_VERSION")), ("build", build)]));
-            ui.label(tl!("A free, open-source word processor written from scratch in Rust.\nPart of the Crafting Apps from the ArtCraft team."));
+            ui.label(tl!("A word processor by Cygnus Solutions, built on WordCraft (MIT OR Apache-2.0)."));
             ui.add_space(6.0);
-            ui.hyperlink_to(tl!("getartcraft.com/apps/wordcraft"), "https://getartcraft.com/apps/wordcraft");
-            ui.hyperlink_to(tl!("Join us on Discord: discord.gg/artcraft"), "https://discord.gg/artcraft");
-            ui.hyperlink_to(tl!("Source code: github.com/storytold/wordcraft"), "https://github.com/storytold/wordcraft");
-            ui.add_space(6.0);
-            ui.label(egui::RichText::new(tl!("MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team and the WordCraft contributors.")).small().weak());
+            ui.label(
+                egui::RichText::new(tl!("Copyright (c) 2026 Cygnus Solutions. Includes WordCraft, copyright (c) 2026 the WordCraft contributors."))
+                    .small()
+                    .weak(),
+            );
         }
     }
     // One Close button: About has nothing to cancel.

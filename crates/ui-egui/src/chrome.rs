@@ -4,7 +4,7 @@ use egui::{Align2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::json;
 use wordcraft_doc::{PartKind, StoryRef};
 
-use crate::theme::{Tokens, TypeRung, fit_text, medium, paint_text, regular, semibold, text_width};
+use crate::theme::{Tokens, TypeRung, fit_text, paint_text, regular, semibold, text_width};
 use crate::{StatusCount, StatusCounts, WordApp, icons};
 
 /// Why the caret's language isn't spell-checked (dictionary unreadable or missing), if it isn't.
@@ -16,7 +16,7 @@ pub(crate) fn dictionary_problem(lang: &str, unreadable: &Option<(std::path::Pat
         )),
         (None, Some(name)) => Some(crate::i18n::fmt(
             tl!(
-                "No spelling dictionary for {language} is installed, so it isn't checked. WordCraft looks for the Hunspell dictionary {name} in the WORDCRAFT_DICTIONARIES folder and in the usual system locations."
+                "No spelling dictionary for {language} is installed, so it isn't checked. Type and Writer looks for the Hunspell dictionary {name} in the WORDCRAFT_DICTIONARIES folder and in the usual system locations."
             ),
             &[("language", lang), ("name", name)],
         )),
@@ -394,28 +394,6 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                             let _ = app.run("ui.backstage", json!({"value": true, "page": "options", "pane": "general"}));
                         }
                         ui.add_space(8.0);
-                        if app.ui.show_discord {
-                            let (r, resp) = ui.allocate_exact_size(vec2(84.0, 22.0), Sense::click());
-                            ui.painter().rect_filled(r, 11.0, if resp.hovered() { t.accent_text } else { t.accent });
-                            icons::paint(
-                                ui.painter(),
-                                Rect::from_center_size(pos2(crate::rtl::lead_x(rtl, r, 13.0), r.center().y), vec2(14.0, 14.0)),
-                                "discord",
-                                t.on_accent,
-                                t.on_accent,
-                            );
-                            ui.painter().text(
-                                pos2(crate::rtl::lead_x(rtl, r, 24.0), r.center().y),
-                                crate::rtl::lead_center(rtl),
-                                tl!("Discord"),
-                                medium(11.5),
-                                t.on_accent,
-                            );
-                            if resp.on_hover_text(tl!("Join the ArtCraft community on Discord")).clicked() {
-                                let _ = app.run("ui.discord", json!({}));
-                            }
-                            ui.add_space(8.0);
-                        }
                         search_box(app, ui, control_h);
                         right_start = if rtl { ui.min_rect().max.x } else { ui.min_rect().min.x };
                     });
@@ -425,7 +403,7 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
             // Centred title.
             let title = if !app.has_document() {
                 // No document open (#1129): the app's name alone.
-                "WordCraft".to_string()
+                "Type and Writer".to_string()
             } else {
                 format!(
                     "{} — {}",

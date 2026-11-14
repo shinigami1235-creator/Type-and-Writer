@@ -58,11 +58,8 @@ fn back_chevron_c(band_min_x: f32, center_y: f32, fullscreen: bool, content_left
 /// The bottom of the backstage menu: About, and the community link unless the user turned the
 /// community button off — the title bar pill honors the same setting, so the menu hides the
 /// link with it.
-fn bottom_links(app: &WordApp) -> Vec<(&'static str, &'static str)> {
-    let mut links = vec![("About", "about")];
-    if app.ui.show_discord {
-        links.push(("Discord community", "discord"));
-    }
+fn bottom_links(_app: &WordApp) -> Vec<(&'static str, &'static str)> {
+    let links = vec![("About", "about")];
     links
 }
 
@@ -167,7 +164,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 }
             }
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                for (label, id) in bottom_links(app) {
+                for (label, _) in bottom_links(app) {
                     let (r, resp) = ui.allocate_exact_size(vec2(200.0, 32.0), Sense::click());
                     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!(label)));
                     if resp.hovered() {
@@ -176,11 +173,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     let at = pos2(crate::rtl::lead_x(rtl, r, 22.0), r.center().y);
                     ui.painter().text(at, crate::rtl::lead_center(rtl), tl!(label), regular(13.0), egui::Color32::WHITE);
                     if resp.clicked() {
-                        if id == "discord" {
-                            let _ = app.run("ui.discord", json!({}));
-                        } else {
-                            app.dialog = crate::dialogs::Dialog::open("about", app);
-                        }
+                        app.dialog = crate::dialogs::Dialog::open("about", app);
                     }
                 }
             });
@@ -737,8 +730,8 @@ fn open_page(app: &mut WordApp, ui: &mut Ui) {
     // doesn't show up, WordCraft's own browser is always one click away.
     #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
     if ui
-        .button(egui::RichText::new(tl!("Browse in WordCraft…")).font(medium(14.0)))
-        .on_hover_text(tl!("Open a file with WordCraft's own browser when the system file dialog doesn't appear."))
+        .button(egui::RichText::new(tl!("Browse in Type and Writer…")).font(medium(14.0)))
+        .on_hover_text(tl!("Open a file with Type and Writer's own browser when the system file dialog doesn't appear."))
         .clicked()
     {
         let _ = app.run("ui.fileBrowser", json!({}));
@@ -847,6 +840,14 @@ fn info_properties(app: &mut WordApp, ui: &mut Ui, info: &serde_json::Value) {
             let _ = app.run("file.encrypt", json!({"password": null}));
         }
     });
+    // Version History (Type and Writer): every save is kept.
+    ui.add_space(18.0);
+    ui.label(egui::RichText::new(tl!("Version History")).font(semibold(15.0)));
+    ui.label(tl!("Every save is kept. Open, compare or restore an earlier one."));
+    if ui.button(egui::RichText::new(tl!("Version History…")).font(medium(13.5))).clicked() {
+        app.ui.backstage = false;
+        let _ = app.run("file.versionHistory", json!({}));
+    }
 }
 
 fn info_statistics(ui: &mut Ui, info: &serde_json::Value) {

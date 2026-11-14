@@ -1,0 +1,17 @@
+[package]
+name = "wordcraft-ocr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Type and Writer: reads the text of scanned PDF pages with ocrs, for the PDF importer"
+
+[lints]
+workspace = true
+
+[dependencies]
+wordcraft-formats = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+# OCR engine (MIT OR Apache-2.0); models are the ocrs project's (CC-BY-SA-4.0), shipped beside the app.
+ocrs = { version = "0.14.0", default-features = false, features = ["rten"] }
+rten = { version = "0.28.0", default-features = false, features = ["rten_format"] }

@@ -95,6 +95,16 @@ Copy-Item (Join-Path $Bin 'wordcraft.exe'), (Join-Path $Bin 'wordcraft-cli.exe')
 
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'wordcraft.exe') (Join-Path $Stage 'wordcraft-cli.exe')
 
+# Type and Writer: OCR models (ocr\) and the speech engine and model (whisper\) go beside the program.
+$Extras = Join-Path $TargetDir "windows-package\extras-$Arch"
+Remove-Item -Recurse -Force $Extras -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $Extras | Out-Null
+$HasExtras = 0
+if ($env:TAW_EXTRAS -and (Test-Path $env:TAW_EXTRAS)) {
+  Copy-Item -Recurse -Path (Join-Path $env:TAW_EXTRAS '*') -Destination $Extras
+  $HasExtras = 1
+}
+
 # Required notices ship in every MSI, independently of optional craft-fonts.
 $AppNotices = Join-Path $Stage 'app-notices'
 New-Item -ItemType Directory -Force -Path $AppNotices | Out-Null
@@ -147,13 +157,14 @@ $rtf = '{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fswiss\fcharset0 Tahoma;}}\vi
 # One MSI from one dual-scope source (see wordcraft.wxs and install-policy.wxi): per user by default into
 # %LOCALAPPDATA%\Programs\ArtCraft\WordCraft (#39), per machine into Program Files\ArtCraft on request.
 # The plain name is the one every sibling app, the launcher and the shared windows-arm64 workflow expect.
-$Msi = Join-Path $Dist "wordcraft-$Version-windows-$Arch.msi"
+$Msi = Join-Path $Dist "type-and-writer-$Version-windows-$Arch.msi"
 Invoke-Native "wix build" {
   wix build (Join-Path $PSScriptRoot 'wordcraft.wxs') -arch $Arch `
     -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
     -d "Version=$MsiVersion" -d "BinDir=$Stage" -d "IconPath=$(Join-Path $Root 'assets\app-icon\wordcraft.ico')" `
     -d "LicenseRtf=$LicenseRtf" `
     -d "AppNoticesDir=$AppNotices" -d "DocsDir=$Docs" -d "HasCraftFontLicences=$HasCraftFontLicences" -d "Scope=perUserOrMachine" `
+    -d "ExtrasDir=$Extras" -d "HasExtras=$HasExtras" `
     -o $Msi
 }
 # Check the compiled scope, path and registration contract before signing.
@@ -169,6 +180,7 @@ $Portable = Join-Path $TargetDir "windows-package\wordcraft-$Version-windows-$Ar
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
+if ($HasExtras -eq 1) { Copy-Item -Recurse -Path (Join-Path $Extras '*') -Destination $Portable }
 foreach ($f in 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'ATTRIBUTION.md') {
   $p = Join-Path $Root $f
   if (Test-Path $p) { Copy-Item $p $Portable }
@@ -179,7 +191,7 @@ if ($env:CRAFT_FONTS_DIR) {
     Copy-Item $ofl.FullName (Join-Path $Portable "OFL-$($ofl.Directory.Name).txt")
   }
 }
-$Zip = Join-Path $Dist "wordcraft-$Version-windows-$Arch-portable.zip"
+$Zip = Join-Path $Dist "type-and-writer-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Portable -DestinationPath $Zip
 

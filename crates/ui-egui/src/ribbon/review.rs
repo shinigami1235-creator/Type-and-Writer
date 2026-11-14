@@ -108,6 +108,7 @@ pub(super) fn review(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Compare", None, app, |ui, app| {
         big(ui, app, "compare", "Compare", "review.compare", json!({}), false);
+        big(ui, app, "recover", "Version\nHistory", "file.versionHistory", json!({}), false);
     });
     group(ui, "Protect", None, app, |ui, app| {
         big(ui, app, "blockAuthors", "Block\nAuthors", "review.blockAuthors", json!({}), false);
@@ -175,7 +176,6 @@ pub(super) fn help(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Help", None, app, |ui, app| {
         big(ui, app, "help", "Help", "ui.dialog", json!({"name": "about"}), false);
         big(ui, app, "checkForUpdates", "Check for\nUpdates…", "ui.checkForUpdates", json!({}), false);
-        big(ui, app, "discord", "Community\nDiscord", "ui.discord", json!({}), false);
     });
     group(ui, "Agents", None, app, |ui, app| {
         big(ui, app, "macros", "Commands", "ui.dialog", json!({"name": "commands"}), false);

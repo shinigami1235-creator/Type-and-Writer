@@ -393,13 +393,16 @@ fn encrypt(s: &mut Session, v: &Value) -> CmdResult {
 /// Executes `file.save`: writes the document or text to disk, preserving exact file text for
 /// unedited Markdown files, and updating session path and dirty state.
 fn save(s: &mut Session, v: &Value) -> CmdResult {
-    let path = match p::str(v, "path").map(std::path::PathBuf::from).or_else(|| s.path.clone()) {
-        Some(p) => p,
-        None => {
-            s.push_ui_request(json!({"open": "saveAs"}));
-            return Ok(json!({"saved": false}));
-        }
-    };
+    // A PDF opened for editing saves beside it as a Word document: the PDF it came from stays.
+    let opened_pdf = s.path.clone().filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")));
+    let path =
+        match p::str(v, "path").map(std::path::PathBuf::from).or_else(|| opened_pdf.map(|p| p.with_extension("docx"))).or_else(|| s.path.clone()) {
+            Some(p) => p,
+            None => {
+                s.push_ui_request(json!({"open": "saveAs"}));
+                return Ok(json!({"saved": false}));
+            }
+        };
     check_strict_output(p::bool(v, "strict").unwrap_or(false), &path.to_string_lossy())?;
     if let Some(pw) = v.get("password").filter(|pw| !pw.is_null()) {
         let Some(pw) = pw.as_str().filter(|pw| !pw.is_empty()) else {
@@ -459,6 +462,12 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
         s.relayout();
         // What the file holds now.
         s.md_file = super::md_source::FileText::saved(exact.filter(|_| super::md_source::is_markdown_file(&path)));
+        // Keep this save in the document's version history (Type and Writer). An encrypted
+        // file is never copied out of its folder.
+        #[cfg(not(target_arch = "wasm32"))]
+        if !encrypted && let Err(e) = crate::history::record(&path) {
+            log::warn!("version history: {e}");
+        }
     }
     Ok(json!({"saved": true, "path": path.to_string_lossy(), "encrypted": encrypted, "rewritten": rewritten}))
 }
