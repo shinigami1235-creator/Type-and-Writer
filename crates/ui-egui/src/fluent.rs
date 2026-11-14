@@ -1,7 +1,7 @@
 //! Ribbon icons from Microsoft's Fluent UI System Icons (MIT, `assets/fluent-icons/LICENSE`),
-//! coloured the way Word colours its ribbon: grey outlines, with a pale fill in the theme's blue
-//! (yellow for Format Painter, green for SmartArt) inside the main shapes, and blue lines on a
-//! few. Each SVG is drawn once per size into a white mask and tinted. Icons without a Fluent
+//! coloured the way Word colours its ribbon: grey outlines; pages, comment bubbles and tables
+//! white inside; a pale fill in the theme's blue on pictures, shapes and the clipboard (yellow
+//! for Format Painter, green for SmartArt); and blue lines on a few. Each SVG is drawn once per size into a white mask and tinted. Icons without a Fluent
 //! match keep their own drawing ([`crate::icons`]). `TAW_CLASSIC_ICONS` switches them off.
 
 use std::sync::OnceLock;
@@ -24,6 +24,8 @@ enum Accent {
     None,
     /// A pale fill of this colour (the theme accent when `None`) under the grey outline.
     Fill(Option<Color32>),
+    /// White inside, like paper: pages, comment bubbles, table cells (none in a dark theme).
+    Paper,
     /// The outline itself in the theme accent.
     Line,
 }
@@ -34,8 +36,9 @@ fn accent_of(name: &str) -> Accent {
     match name {
         "painter" => Accent::Fill(Some(yellow)),
         "smartArt" => Accent::Fill(Some(green)),
-        "paste" | "picture" | "shapes" | "chart" | "table" | "header" | "footer" | "pageNumber" | "coverPage" | "blankPage" | "pageBreak"
-        | "textBox" | "newComment" | "dictate" | "signature" | "dateTime" | "object" | "icons" | "editor" | "copy" => Accent::Fill(None),
+        "paste" | "picture" | "shapes" | "chart" | "icons" | "dictate" | "signature" => Accent::Fill(None),
+        "header" | "footer" | "pageNumber" | "coverPage" | "blankPage" | "pageBreak" | "textBox" | "newComment" | "table" | "copy" | "object"
+        | "dateTime" | "editor" => Accent::Paper,
         "link" | "bookmark" | "crossRef" | "equation" | "symbol" => Accent::Line,
         _ => Accent::None,
     }
@@ -79,6 +82,10 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) -> b
     let rect = Rect::from_center_size(r.center(), vec2(side, side));
     let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
     let kind = accent_of(name);
+    let paper = matches!(kind, Accent::Paper) && !ctx.global_style().visuals.dark_mode;
+    if paper && let Some(t) = texture(ctx, name, if large_one { "lf" } else { "sf" }, filled, px) {
+        p.image(t.id(), rect, uv, Color32::WHITE);
+    }
     if let Accent::Fill(colour) = kind
         && let Some(t) = texture(ctx, name, if large_one { "lf" } else { "sf" }, filled, px)
     {
