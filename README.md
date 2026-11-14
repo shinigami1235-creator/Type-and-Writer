@@ -17,7 +17,7 @@ Type and Writer is the Cygnus Solutions word processor for Windows. It looks and
 2. Download `type-and-writer-<version>-windows-x64.msi` and run it. It installs for your user account only and needs no admin rights.
 3. To connect Claude, download `type-and-writer.mcpb` and double-click it with the Claude desktop app open, then press Install.
 
-The portable zip has the same program for running without installing.
+The portable zip has the same program, ready to run from any folder without installing.
 
 ## Where things are kept
 
