@@ -750,7 +750,7 @@ fn plan_strip_gives_way_in_order() {
 fn the_tab_strip_buttons_have_names() {
     use egui_kittest::kittest::Queryable;
     let app = WordApp::new(Session::new(wordcraft_doc::Document::from_text("Text")), crate::Services::default());
-    let mut h = egui_kittest::Harness::builder().with_size(vec2(760.0, 700.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(640.0, 700.0)).build_ui_state(
         |ui, app: &mut WordApp| {
             let ctx = ui.ctx().clone();
             app.logic(&ctx);

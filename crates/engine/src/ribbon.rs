@@ -87,7 +87,12 @@ fn reserved(name: &str) -> bool {
 }
 
 fn default_tabs() -> Vec<TabEntry> {
-    TABS.iter().skip(1).map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: false, groups: Vec::new() }).collect()
+    // Type and Writer: Developer and Zotero start hidden, as Developer does in Word (File ›
+    // Options › Customize Ribbon shows them).
+    TABS.iter()
+        .skip(1)
+        .map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: matches!(*t, "Developer" | "Zotero"), groups: Vec::new() })
+        .collect()
 }
 
 /// `base`, or `base 2`, `base 3`… whichever `taken` doesn't have yet.

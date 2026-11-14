@@ -392,6 +392,7 @@ fn services(file_dialog: file_dialogs::Hook, cancel_file_dialog: file_dialogs::C
         clipboard_formats: Some(Box::new(clipboard::formats)),
         save_prefs: Some(Box::new(try_save_prefs)),
         open_external: Some(Box::new(external::open)),
+        ask_name: true,
         dictation: Some(Box::new(dictation::Desktop::new({
             let ctx = ctx.clone();
             std::sync::Arc::new(move || ctx.request_repaint())

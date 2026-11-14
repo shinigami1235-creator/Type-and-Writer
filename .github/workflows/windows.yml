@@ -53,6 +53,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: taw-windows-x64
+          cache-on-failure: true
 
       - name: Install WiX
         shell: pwsh

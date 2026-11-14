@@ -17,6 +17,8 @@ pub trait Dictation {
 /// Platform services injected by the host (file dialogs, file I/O).
 #[derive(Default)]
 pub struct Services {
+    /// Desktop: ask for the person's name on a first run, for comments and tracked changes.
+    pub ask_name: bool,
     /// Desktop: Dictate (Home › Voice).
     pub dictation: Option<Box<dyn Dictation>>,
     /// Desktop: open a file in another program (`purpose` "sign": the PDF reader set for

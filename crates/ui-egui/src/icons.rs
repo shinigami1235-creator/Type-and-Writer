@@ -73,6 +73,10 @@ impl Pen<'_> {
 
 /// Paint icon `name` into `r`. `c` is the line colour; the accent comes from the theme.
 pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
+    // Type and Writer: Microsoft's Fluent icons where there is one.
+    if crate::fluent::paint(p, r, name, c) {
+        return;
+    }
     let pen = Pen { p, r, c, a: accent, w: 1.25 };
     if let Some(kind) = name.strip_prefix("shape.")
         && shape(&pen, kind)

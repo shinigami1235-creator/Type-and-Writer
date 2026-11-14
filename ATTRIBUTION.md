@@ -72,3 +72,4 @@ These files are downloaded by `.github/workflows/windows.yml` and installed besi
 | `ocr/text-detection.rten`, `ocr/text-recognition.rten` | Robert Knight (ocrs-models) | https://huggingface.co/Pieces/ocrs-mirror (mirror of https://github.com/robertknight/ocrs-models) | CC-BY-SA-4.0 |
 | `whisper/whisper-server.exe` and its DLLs | The ggml authors (whisper.cpp) | https://github.com/ggml-org/whisper.cpp releases | MIT |
 | `whisper/ggml-small.en-q5_1.bin` | OpenAI (Whisper), converted by the whisper.cpp authors | https://huggingface.co/ggerganov/whisper.cpp | MIT |
+| `assets/fluent-icons/*.svg` | Microsoft Corporation (Fluent UI System Icons) | https://github.com/microsoft/fluentui-system-icons (npm `@fluentui/svg-icons`) | MIT (`assets/fluent-icons/LICENSE`) |

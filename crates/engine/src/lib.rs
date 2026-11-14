@@ -11,6 +11,10 @@ pub mod cmd;
 pub(crate) mod doc_state;
 pub mod file_access;
 pub use io::history;
+
+/// The name comments and tracked changes carry until the person sets their own (File ›
+/// Options › General, or the desktop app's first-run question).
+pub const DEFAULT_AUTHOR: &str = "Author";
 pub(crate) mod ime;
 pub mod io;
 mod io_ext;
