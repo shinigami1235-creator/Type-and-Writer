@@ -9,6 +9,7 @@ Type and Writer is the Cygnus Solutions word processor for Windows. It looks and
 - **Version history.** Every save keeps a copy, up to 50 per document. File › Info › Version History, or Review › Version History, opens one, compares it with the current document as tracked changes, or restores it. Undo takes a restore back.
 - **Dictate.** Home › Dictate types what you say at the cursor. The speech model runs on the laptop with no internet connection.
 - **Sign as PDF.** Insert › Sign as PDF saves the document as a PDF beside it and opens it in the PDF reader that signs. Put the reader's program path in `signer.txt` in the settings folder to use the Cygnus Solutions PDF reader, or leave it out to use the default PDF app.
+- **Ribbon icons.** Microsoft's Fluent icons with Word's colouring: grey outlines with a pale blue fill on the main buttons, yellow on Format Painter and green on SmartArt.
 - **Claude extension.** `type-and-writer.mcpb` lets Claude write and edit documents in the open window. Claude opens Type and Writer itself when it isn't running.
 
 ## Install
