@@ -120,7 +120,9 @@ fn paragraph_tools_menu_entries_run_their_commands() {
     use egui_kittest::kittest::Queryable;
     let a = WordApp::new(Session::new(wordcraft_doc::Document::from_text("a  b\n\nc   d")), crate::Services::default());
     let mut h = egui_kittest::Harness::builder()
-        .with_size(vec2(900.0, 300.0))
+        // Paragraph Tools sits after Word's own groups, at the end of Home, and the groups stack
+        // down the page here.
+        .with_size(vec2(900.0, 1200.0))
         .with_context_setup(|ctx| ctx.set_fonts(crate::theme::font_definitions(false, false)))
         .build_ui_state(|ui, app: &mut WordApp| super::home::home(app, ui), a);
     h.run_steps(2);

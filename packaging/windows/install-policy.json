@@ -32,7 +32,7 @@
       "-1",
       "Software\\WordCraft\\Capabilities",
       "ApplicationName",
-      "WordCraft"
+      "Type and Writer"
     ],
     [
       "-1",
@@ -50,7 +50,7 @@
       "-1",
       "Software\\Classes\\Applications\\wordcraft.exe",
       "FriendlyAppName",
-      "WordCraft"
+      "Type and Writer"
     ],
     [
       "-1",

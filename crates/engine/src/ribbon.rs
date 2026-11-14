@@ -87,11 +87,11 @@ fn reserved(name: &str) -> bool {
 }
 
 fn default_tabs() -> Vec<TabEntry> {
-    // Type and Writer: Developer and Zotero start hidden, as Developer does in Word (File ›
-    // Options › Customize Ribbon shows them).
+    // Type and Writer: Draw, Developer and Zotero start hidden, as Draw and Developer do in Word
+    // on a laptop (File › Options › Customize Ribbon shows them).
     TABS.iter()
         .skip(1)
-        .map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: matches!(*t, "Developer" | "Zotero"), groups: Vec::new() })
+        .map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: matches!(*t, "Draw" | "Developer" | "Zotero"), groups: Vec::new() })
         .collect()
 }
 

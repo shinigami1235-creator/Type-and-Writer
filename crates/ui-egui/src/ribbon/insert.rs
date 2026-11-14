@@ -96,11 +96,9 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
                 mi_icon(ui, app, &format!("shape.{icon}"), l, "insert.shape", json!({"kind": k, "arrow": arrow}));
             }
         });
-        stack(ui, |ui| {
-            small(ui, app, "icons", Some("Icons"), "Icons", crate::widgets::ButtonAction::new("insert.icon", json!({}), false));
-            small(ui, app, "smartArt", Some("SmartArt"), "SmartArt", crate::widgets::ButtonAction::new("insert.smartArt", json!({}), false));
-            small(ui, app, "chart", Some("Chart"), "Chart", crate::widgets::ButtonAction::new("insert.chart", json!({}), false));
-        });
+        big(ui, app, "icons", "Icons", "insert.icon", json!({}), false);
+        big(ui, app, "smartArt", "SmartArt", "insert.smartArt", json!({}), false);
+        big(ui, app, "chart", "Chart", "insert.chart", json!({}), false);
     });
     group(ui, "Links", None, app, |ui, app| {
         stack(ui, |ui| {
@@ -127,34 +125,7 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
         big(ui, app, "newComment", "Comment", "review.newComment", json!({}), false);
     });
     group(ui, "Header & Footer", None, app, |ui, app| {
-        menu_button(ui, app, crate::widgets::MenuButtonOptions::new("header", Some("Header"), "Header", true, "insert.header"), |ui, app| {
-            mi(ui, app, "Blank", "insert.header", json!({"preset": "blank"}));
-            mi(ui, app, "Blank (Three Columns)", "insert.header", json!({"preset": "blankThree"}));
-            mi(ui, app, "Document Title", "insert.header", json!({"preset": "title"}));
-            ui.separator();
-            mi(ui, app, "Edit Header", "insert.editHeader", json!({}));
-            mi(ui, app, "Remove Header", "insert.removeHeader", json!({}));
-        });
-        menu_button(ui, app, crate::widgets::MenuButtonOptions::new("footer", Some("Footer"), "Footer", true, "insert.footer"), |ui, app| {
-            mi(ui, app, "Blank", "insert.footer", json!({"preset": "blank"}));
-            mi(ui, app, "Blank (Three Columns)", "insert.footer", json!({"preset": "blankThree"}));
-            mi(ui, app, "Page Number", "insert.footer", json!({"preset": "pageNumber"}));
-            ui.separator();
-            mi(ui, app, "Edit Footer", "insert.editFooter", json!({}));
-            mi(ui, app, "Remove Footer", "insert.removeFooter", json!({}));
-        });
-        menu_button(
-            ui,
-            app,
-            crate::widgets::MenuButtonOptions::new("pageNumber", Some("Page\nNumber"), "Page Number", true, "insert.pageNumber"),
-            |ui, app| {
-                mi(ui, app, "Top of Page", "insert.pageNumber", json!({"position": "top", "align": "right"}));
-                mi(ui, app, "Bottom of Page", "insert.pageNumber", json!({"position": "bottom", "align": "center"}));
-                mi(ui, app, "Page X of Y", "insert.pageNumber", json!({"position": "bottom", "format": "x of y"}));
-                mi(ui, app, "Current Position", "insert.pageNumber", json!({"position": "current"}));
-                mi(ui, app, "Format Page Numbers…", "ui.dialog", json!({"name": "pageNumbers"}));
-            },
-        );
+        stack(ui, |ui| header_footer_items(ui, app));
     });
     group(ui, "Text", None, app, |ui, app| {
         big(ui, app, "textBox", "Text\nBox", "insert.textBox", json!({}), false);
@@ -189,48 +160,74 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
             );
         });
         stack(ui, |ui| {
-            small(ui, app, "signature", None, "Signature Line", crate::widgets::ButtonAction::new("insert.signatureLine", json!({}), false));
-            small(ui, app, "dateTime", None, "Date & Time", crate::widgets::ButtonAction::new("ui.dialog", json!({"name": "dateTime"}), false));
-            small(ui, app, "object", None, "Object", crate::widgets::ButtonAction::new("insert.object", json!({}), false));
+            small(
+                ui,
+                app,
+                "signature",
+                Some("Signature Line"),
+                "Signature Line",
+                crate::widgets::ButtonAction::new("insert.signatureLine", json!({}), false),
+            );
+            small(
+                ui,
+                app,
+                "dateTime",
+                Some("Date & Time"),
+                "Date & Time",
+                crate::widgets::ButtonAction::new("ui.dialog", json!({"name": "dateTime"}), false),
+            );
+            small(ui, app, "object", Some("Object"), "Object", crate::widgets::ButtonAction::new("insert.object", json!({}), false));
         });
-    });
-    // Type and Writer: the document as a PDF, opened in the reader that signs it.
-    group(ui, "Sign", None, app, |ui, app| {
-        big(ui, app, "signature", "Sign as\nPDF", "file.signAsPdf", json!({}), false);
     });
     group(ui, "Symbols", None, app, |ui, app| {
-        crate::equation_tab::insert_button(ui, app);
-        menu_button(ui, app, crate::widgets::MenuButtonOptions::new("symbol", Some("Symbol"), "Symbol", true, "insert.symbol"), |ui, app| {
-            // Recently used symbols first (their font on hover), then common ones.
-            let mut items: Vec<(String, String)> = app.ui.recent_symbols.iter().map(|r| (r.ch.clone(), r.font.clone())).collect();
-            for c in [
-                "©", "®", "™", "§", "¶", "€", "£", "¥", "°", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α", "β", "π", "Ω", "∑", "√", "→", "←", "✓",
-                "★", "♥", "—", "…",
-            ] {
-                if !items.iter().any(|(ch, f)| ch == c && f.is_empty()) {
-                    items.push((c.to_string(), String::new()));
+        stack(ui, |ui| {
+            menu_button(
+                ui,
+                app,
+                crate::widgets::MenuButtonOptions::new("equation", Some("Equation"), "Equation", false, "insert.equation"),
+                |ui, app| {
+                    mi(ui, app, "Insert New Equation", "insert.equation", json!({}));
+                    ui.separator();
+                    crate::equation_tab::builtin_menu(ui, app);
+                },
+            );
+            symbol_menu(ui, app);
+        });
+    });
+}
+
+/// Insert › Symbol: recently used symbols, common ones, then More Symbols.
+fn symbol_menu(ui: &mut Ui, app: &mut WordApp) {
+    menu_button(ui, app, crate::widgets::MenuButtonOptions::new("symbol", Some("Symbol"), "Symbol", false, "insert.symbol"), |ui, app| {
+        // Recently used symbols first (their font on hover), then common ones.
+        let mut items: Vec<(String, String)> = app.ui.recent_symbols.iter().map(|r| (r.ch.clone(), r.font.clone())).collect();
+        for c in [
+            "©", "®", "™", "§", "¶", "€", "£", "¥", "°", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α", "β", "π", "Ω", "∑", "√", "→", "←", "✓", "★",
+            "♥", "—", "…",
+        ] {
+            if !items.iter().any(|(ch, f)| ch == c && f.is_empty()) {
+                items.push((c.to_string(), String::new()));
+            }
+        }
+        items.truncate(30);
+        crate::rtl::grid(ui, egui::Grid::new("syms"), |ui| {
+            for (i, (c, font)) in items.iter().enumerate() {
+                let b = ui.button(egui::RichText::new(c).size(16.0));
+                let b = if font.is_empty() { b } else { b.on_hover_text(font) };
+                if b.clicked() {
+                    let params = if font.is_empty() { json!({"char": c}) } else { json!({"char": c, "font": font}) };
+                    if app.run("insert.symbol", params).is_ok() {
+                        crate::dialogs_insert::remember_symbol(app, c, font);
+                    }
+                    ui.close();
+                }
+                if i % 6 == 5 {
+                    ui.end_row();
                 }
             }
-            items.truncate(30);
-            crate::rtl::grid(ui, egui::Grid::new("syms"), |ui| {
-                for (i, (c, font)) in items.iter().enumerate() {
-                    let b = ui.button(egui::RichText::new(c).size(16.0));
-                    let b = if font.is_empty() { b } else { b.on_hover_text(font) };
-                    if b.clicked() {
-                        let params = if font.is_empty() { json!({"char": c}) } else { json!({"char": c, "font": font}) };
-                        if app.run("insert.symbol", params).is_ok() {
-                            crate::dialogs_insert::remember_symbol(app, c, font);
-                        }
-                        ui.close();
-                    }
-                    if i % 6 == 5 {
-                        ui.end_row();
-                    }
-                }
-            });
-            ui.separator();
-            mi(ui, app, "More Symbols…", "ui.dialog", json!({"name": "symbol"}));
         });
+        ui.separator();
+        mi(ui, app, "More Symbols…", "ui.dialog", json!({"name": "symbol"}));
     });
 }
 
@@ -249,4 +246,36 @@ fn drop_cap_items(ui: &mut Ui, app: &mut WordApp) {
     }
     ui.separator();
     mi(ui, app, "Drop Cap Options…", "ui.dialog", json!({"name": "dropCap"}));
+}
+
+/// Header, Footer and Page Number stacked small with their labels, as Word shows them.
+fn header_footer_items(ui: &mut Ui, app: &mut WordApp) {
+    menu_button(ui, app, crate::widgets::MenuButtonOptions::new("header", Some("Header"), "Header", false, "insert.header"), |ui, app| {
+        mi(ui, app, "Blank", "insert.header", json!({"preset": "blank"}));
+        mi(ui, app, "Blank (Three Columns)", "insert.header", json!({"preset": "blankThree"}));
+        mi(ui, app, "Document Title", "insert.header", json!({"preset": "title"}));
+        ui.separator();
+        mi(ui, app, "Edit Header", "insert.editHeader", json!({}));
+        mi(ui, app, "Remove Header", "insert.removeHeader", json!({}));
+    });
+    menu_button(ui, app, crate::widgets::MenuButtonOptions::new("footer", Some("Footer"), "Footer", false, "insert.footer"), |ui, app| {
+        mi(ui, app, "Blank", "insert.footer", json!({"preset": "blank"}));
+        mi(ui, app, "Blank (Three Columns)", "insert.footer", json!({"preset": "blankThree"}));
+        mi(ui, app, "Page Number", "insert.footer", json!({"preset": "pageNumber"}));
+        ui.separator();
+        mi(ui, app, "Edit Footer", "insert.editFooter", json!({}));
+        mi(ui, app, "Remove Footer", "insert.removeFooter", json!({}));
+    });
+    menu_button(
+        ui,
+        app,
+        crate::widgets::MenuButtonOptions::new("pageNumber", Some("Page Number"), "Page Number", false, "insert.pageNumber"),
+        |ui, app| {
+            mi(ui, app, "Top of Page", "insert.pageNumber", json!({"position": "top", "align": "right"}));
+            mi(ui, app, "Bottom of Page", "insert.pageNumber", json!({"position": "bottom", "align": "center"}));
+            mi(ui, app, "Page X of Y", "insert.pageNumber", json!({"position": "bottom", "format": "x of y"}));
+            mi(ui, app, "Current Position", "insert.pageNumber", json!({"position": "current"}));
+            mi(ui, app, "Format Page Numbers…", "ui.dialog", json!({"name": "pageNumbers"}));
+        },
+    );
 }

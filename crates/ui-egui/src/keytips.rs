@@ -229,8 +229,8 @@ fn controls(tab: &str) -> Vec<Control> {
             c("Find", "edit.find"),
             d("Replace", "replace"),
             m("Select", "select.all"),
+            c("Sign as PDF", "file.signAsPdf"),
             c("Dictate", "tools.dictate"),
-            c("Editor", "review.spelling"),
         ],
         "Insert" => vec![
             m("Cover Page", "insert.coverPage"),
@@ -256,7 +256,7 @@ fn controls(tab: &str) -> Vec<Control> {
             c("Signature Line", "insert.signatureLine"),
             d("Date & Time", "dateTime"),
             c("Object", "insert.object"),
-            c("Equation", "insert.equation"),
+            m("Equation", "insert.equation"),
             m("Symbol", "insert.symbol"),
         ],
         "Draw" => vec![

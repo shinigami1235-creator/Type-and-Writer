@@ -7,8 +7,14 @@ use super::{Remember, Stroke, Target, Tokens, Ui, Value, WordApp, big, big_toggl
 fn format_painter_button(ui: &mut Ui, app: &mut WordApp) {
     let sticky = matches!(app.session.painter, Some((_, _, true)));
     let armed = app.session.painter.is_some();
-    let resp =
-        small(ui, app, "painter", Some("Format"), "Format Painter", crate::widgets::ButtonAction::new("edit.formatPainter", json!({}), sticky));
+    let resp = small(
+        ui,
+        app,
+        "painter",
+        Some("Format Painter"),
+        "Format Painter",
+        crate::widgets::ButtonAction::new("edit.formatPainter", json!({}), sticky),
+    );
     if resp.double_clicked() {
         painter_double_click(app);
     } else if armed && !sticky {
@@ -29,6 +35,9 @@ pub(super) fn painter_double_click(app: &mut WordApp) {
 pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
     let st = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
+    // Type and Writer: Word shows Phonetic Guide, Character Border and Enclose Characters only
+    // with an East Asian language, and the text direction buttons only with a right-to-left one.
+    let east_asian = crate::i18n::current().uses_cjk();
     group(ui, "Clipboard", Some("edit.clipboardPane"), app, |ui, app| {
         menu_button(ui, app, crate::widgets::MenuButtonOptions::new("paste", Some("Paste"), "Paste (⌘V)", true, "edit.paste"), |ui, app| {
             mi(ui, app, "Paste", "edit.paste", json!({}));
@@ -96,7 +105,9 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
                     mi(ui, app, "tOGGLE cASE", "format.changeCase", json!({"mode": "toggle"}));
                 });
                 small(ui, app, "clear", None, "Clear All Formatting", crate::widgets::ButtonAction::new("format.clear", json!({}), false));
-                small(ui, app, "phonetic", None, "Phonetic Guide", crate::widgets::ButtonAction::new("format.phonetic", json!({}), false));
+                if east_asian {
+                    small(ui, app, "phonetic", None, "Phonetic Guide", crate::widgets::ButtonAction::new("format.phonetic", json!({}), false));
+                }
             });
             ui.add_space(3.0);
             crate::widgets::row(ui, |ui| {
@@ -121,8 +132,17 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
                     "Superscript",
                     crate::widgets::ButtonAction::new("format.superscript", json!({}), flag("superscript")),
                 );
-                small(ui, app, "charborder", None, "Character Border", crate::widgets::ButtonAction::new("format.border", json!({}), flag("border")));
-                small(ui, app, "enclose", None, "Enclose Characters", crate::widgets::ButtonAction::new("format.enclose", json!({}), false));
+                if east_asian {
+                    small(
+                        ui,
+                        app,
+                        "charborder",
+                        None,
+                        "Character Border",
+                        crate::widgets::ButtonAction::new("format.border", json!({}), flag("border")),
+                    );
+                    small(ui, app, "enclose", None, "Enclose Characters", crate::widgets::ButtonAction::new("format.enclose", json!({}), false));
+                }
                 ui.add_space(4.0);
                 menu_button(ui, app, crate::widgets::MenuButtonOptions::new("effects", None, "Text Effects and Typography", false, ""), |ui, app| {
                     let theme = app.session.doc.settings.theme_colors.clone();
@@ -270,9 +290,11 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
                 small(ui, app, "alignCenter", None, "Center", crate::widgets::ButtonAction::new("para.alignCenter", json!({}), align == A::Center));
                 small(ui, app, "alignRight", None, "Align Right", crate::widgets::ButtonAction::new("para.alignRight", json!({}), align == A::Right));
                 small(ui, app, "justify", None, "Justify", crate::widgets::ButtonAction::new("para.justify", json!({}), align == A::Justify));
-                ui.add_space(4.0);
-                small(ui, app, "textLtr", None, "Left-to-Right Text Direction", crate::widgets::ButtonAction::new("para.ltr", json!({}), !rtl));
-                small(ui, app, "textRtl", None, "Right-to-Left Text Direction", crate::widgets::ButtonAction::new("para.rtl", json!({}), rtl));
+                if rtl || crate::i18n::current().rtl() {
+                    ui.add_space(4.0);
+                    small(ui, app, "textLtr", None, "Left-to-Right Text Direction", crate::widgets::ButtonAction::new("para.ltr", json!({}), !rtl));
+                    small(ui, app, "textRtl", None, "Right-to-Left Text Direction", crate::widgets::ButtonAction::new("para.rtl", json!({}), rtl));
+                }
                 ui.add_space(4.0);
                 menu_button(
                     ui,
@@ -330,6 +352,35 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
             });
         });
     });
+    group(ui, "Styles", Some("styles.pane"), app, |ui, app| {
+        crate::previews::style_gallery(app, ui, &st);
+    });
+    group(ui, "Editing", None, app, |ui, app| {
+        stack(ui, |ui| {
+            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("find", Some("Find"), "Find", false, "edit.find"), |ui, app| {
+                // As in Word: Find searches in the Navigation pane; Advanced Find is the dialog (#712).
+                mi(ui, app, "Find", "edit.find", json!({}));
+                mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
+                mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
+            });
+            small(ui, app, "replace", Some("Replace"), "Replace", crate::widgets::ButtonAction::new("ui.dialog", json!({"name": "replace"}), false));
+            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("select", Some("Select"), "Select", false, "select.all"), |ui, app| {
+                mi(ui, app, "Select All", "select.all", json!({}));
+                mi(ui, app, "Select Paragraph", "select.paragraph", json!({}));
+                mi(ui, app, "Select Sentence", "select.sentence", json!({}));
+            });
+        });
+    });
+    // Type and Writer: where Word has Adobe Acrobat's Create a PDF, the document as a PDF opened
+    // in the reader that signs it.
+    group(ui, "Sign", None, app, |ui, app| {
+        big(ui, app, "signature", "Sign as\nPDF", "file.signAsPdf", json!({}), false);
+    });
+    group(ui, "Voice", None, app, |ui, app| {
+        let on = crate::dictate_ui::listening(app);
+        big_toggle(ui, app, "dictate", "Dictate", "tools.dictate", on);
+    });
+    // Type and Writer extras after Word's own groups.
     // Advanced paragraph tools (#5043): conversions and cleanup over the selection, or the
     // whole document with Ctrl+A first (the commands take `scope: "all"` for that as well).
     group(ui, "Paragraph Tools", None, app, |ui, app| {
@@ -355,31 +406,5 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
                 mi(ui, app, l, id, json!({"scope": "all"}));
             }
         });
-    });
-    group(ui, "Styles", Some("styles.pane"), app, |ui, app| {
-        crate::previews::style_gallery(app, ui, &st);
-    });
-    group(ui, "Editing", None, app, |ui, app| {
-        stack(ui, |ui| {
-            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("find", Some("Find"), "Find", false, "edit.find"), |ui, app| {
-                // As in Word: Find searches in the Navigation pane; Advanced Find is the dialog (#712).
-                mi(ui, app, "Find", "edit.find", json!({}));
-                mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
-                mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
-            });
-            small(ui, app, "replace", Some("Replace"), "Replace", crate::widgets::ButtonAction::new("ui.dialog", json!({"name": "replace"}), false));
-            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("select", Some("Select"), "Select", false, "select.all"), |ui, app| {
-                mi(ui, app, "Select All", "select.all", json!({}));
-                mi(ui, app, "Select Paragraph", "select.paragraph", json!({}));
-                mi(ui, app, "Select Sentence", "select.sentence", json!({}));
-            });
-        });
-    });
-    group(ui, "Voice", None, app, |ui, app| {
-        let on = crate::dictate_ui::listening(app);
-        big_toggle(ui, app, "dictate", "Dictate", "tools.dictate", on);
-    });
-    group(ui, "Editor", None, app, |ui, app| {
-        big(ui, app, "editor", "Editor", "review.spelling", json!({}), false);
     });
 }

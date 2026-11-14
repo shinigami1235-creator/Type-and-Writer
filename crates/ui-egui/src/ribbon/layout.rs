@@ -1,7 +1,7 @@
 use super::arrange::{align_menu, group_menu, rotate_menu, wrap_menu};
 use super::common::{mi, size_menu, stack};
 use super::language::mi_check;
-use super::{MeasureExt, Ui, WordApp, big, group, json, menu_button, small, vec2};
+use super::{MeasureExt, Ui, WordApp, big, group, json, menu_button, vec2};
 
 // Layout › Margins, Orientation, Size and Columns: the caret section's setting has a check
 // mark, as Text Direction's does (#1206).
@@ -53,21 +53,24 @@ pub(super) fn layout(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Page Setup", Some("layout.pageSetup"), app, |ui, app| {
         // Text Direction works on what the caret is in: table cells, a text box, else the section.
         let dir = wordcraft_engine::cmd::page::text_direction_at(&app.session);
-        menu_button(
-            ui,
-            app,
-            crate::widgets::MenuButtonOptions::new("textDirection", Some("Text\nDirection"), "Text Direction", true, "layout.textDirection"),
-            |ui, app| {
-                use wordcraft_doc::props::TextDirection;
-                for (label, d) in [
-                    ("Horizontal", TextDirection::Horizontal),
-                    ("Rotate all text 90°", TextDirection::Down),
-                    ("Rotate all text 270°", TextDirection::Up),
-                ] {
-                    mi_check(ui, app, label, dir == d, "layout.textDirection", json!({"value": d.ooxml()}));
-                }
-            },
-        );
+        // Type and Writer: Word shows Text Direction here only with an East Asian language.
+        if crate::i18n::current().uses_cjk() {
+            menu_button(
+                ui,
+                app,
+                crate::widgets::MenuButtonOptions::new("textDirection", Some("Text\nDirection"), "Text Direction", true, "layout.textDirection"),
+                |ui, app| {
+                    use wordcraft_doc::props::TextDirection;
+                    for (label, d) in [
+                        ("Horizontal", TextDirection::Horizontal),
+                        ("Rotate all text 90°", TextDirection::Down),
+                        ("Rotate all text 270°", TextDirection::Up),
+                    ] {
+                        mi_check(ui, app, label, dir == d, "layout.textDirection", json!({"value": d.ooxml()}));
+                    }
+                },
+            );
+        }
         menu_button(ui, app, crate::widgets::MenuButtonOptions::new("margins", Some("Margins"), "Margins", true, "layout.margins"), margins_items);
         menu_button(
             ui,
@@ -120,9 +123,6 @@ pub(super) fn layout(app: &mut WordApp, ui: &mut Ui) {
                 },
             );
         });
-        let fit_resp = big(ui, app, "fitOnePage", "Fit\nOne Page", "layout.fitOnePage", json!({}), false);
-        let fit_label = tl!("Fit\nOne Page").replace('\n', " ");
-        fit_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, fit_label.clone()));
     });
     group(ui, "Paragraph", Some("para.dialog"), app, |ui, app| {
         let rp = app.session.doc.para_at(&app.session.sel.focus).map(|_| wordcraft_engine::cmd::para::selection_para(&app.session));
@@ -192,36 +192,19 @@ pub(super) fn layout(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Arrange", None, app, |ui, app| {
         big(ui, app, "position", "Position", "arrange.position", json!({}), false);
         wrap_menu(ui, app);
+        big(ui, app, "bringForward", "Bring\nForward", "arrange.bringForward", json!({}), false);
+        big(ui, app, "sendBackward", "Send\nBackward", "arrange.sendBackward", json!({}), false);
+        big(ui, app, "selectionPane", "Selection\nPane", "arrange.selectionPane", json!({}), false);
         stack(ui, |ui| {
-            small(
-                ui,
-                app,
-                "bringForward",
-                Some("Bring Forward"),
-                "Bring Forward",
-                crate::widgets::ButtonAction::new("arrange.bringForward", json!({}), false),
-            );
-            small(
-                ui,
-                app,
-                "sendBackward",
-                Some("Send Backward"),
-                "Send Backward",
-                crate::widgets::ButtonAction::new("arrange.sendBackward", json!({}), false),
-            );
-            small(
-                ui,
-                app,
-                "selectionPane",
-                Some("Selection Pane"),
-                "Selection Pane",
-                crate::widgets::ButtonAction::new("arrange.selectionPane", json!({}), false),
-            );
+            align_menu(ui, app, Some("Align"));
+            group_menu(ui, app, Some("Group"));
+            rotate_menu(ui, app, Some("Rotate"));
         });
-        stack(ui, |ui| {
-            align_menu(ui, app, None);
-            group_menu(ui, app, None);
-            rotate_menu(ui, app, None);
-        });
+    });
+    // Type and Writer extras after Word's own groups.
+    group(ui, "Fit", None, app, |ui, app| {
+        let fit_resp = big(ui, app, "fitOnePage", "Fit\nOne Page", "layout.fitOnePage", json!({}), false);
+        let fit_label = tl!("Fit\nOne Page").replace('\n', " ");
+        fit_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, fit_label.clone()));
     });
 }

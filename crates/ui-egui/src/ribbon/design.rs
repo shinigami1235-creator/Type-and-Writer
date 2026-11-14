@@ -26,11 +26,12 @@ pub(super) fn design(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Document Formatting", None, app, |ui, app| {
         style_set_box(app, ui);
-        stack(ui, |ui| {
+        // Colors and Fonts are big buttons, as in Word.
+        {
             menu_button(
                 ui,
                 app,
-                crate::widgets::MenuButtonOptions::new("colors", Some("Colors"), "Theme Colors", false, "design.themeColors"),
+                crate::widgets::MenuButtonOptions::new("colors", Some("Colors"), "Theme Colors", true, "design.themeColors"),
                 |ui, app| {
                     for (name, ..) in wordcraft_engine::cmd::design::THEMES {
                         mi(ui, app, name, "design.themeColors", json!({"name": name}));
@@ -40,14 +41,14 @@ pub(super) fn design(app: &mut WordApp, ui: &mut Ui) {
             menu_button(
                 ui,
                 app,
-                crate::widgets::MenuButtonOptions::new("fonts", Some("Fonts"), "Theme Fonts", false, "design.themeFonts"),
+                crate::widgets::MenuButtonOptions::new("fonts", Some("Fonts"), "Theme Fonts", true, "design.themeFonts"),
                 |ui, app| {
                     for (name, h, b, _) in wordcraft_engine::cmd::design::THEMES {
                         mi_text(ui, app, &format!("{}: {h} / {b}", tl!(name)), "design.themeFonts", json!({"heading": h, "body": b}));
                     }
                 },
             );
-        });
+        }
         stack(ui, |ui| {
             menu_button(
                 ui,

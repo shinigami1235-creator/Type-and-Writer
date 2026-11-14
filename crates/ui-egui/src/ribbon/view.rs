@@ -51,11 +51,6 @@ pub(super) fn view(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Zoom", None, app, |ui, app| {
         big(ui, app, "zoom", "Zoom", "ui.dialog", json!({"name": "zoom"}), false);
         big(ui, app, "zoom100", "100%", "view.zoom100", json!({}), false);
-        // Step the zoom up and down by 10% (issue #67), from whatever the page shows now.
-        stack(ui, |ui| {
-            small(ui, app, "zoomIn", Some("Zoom In"), "Zoom In", crate::widgets::ButtonAction::new("view.zoomIn", json!({}), false));
-            small(ui, app, "zoomOut", Some("Zoom Out"), "Zoom Out", crate::widgets::ButtonAction::new("view.zoomOut", json!({}), false));
-        });
         stack(ui, |ui| {
             small(ui, app, "onePage", Some("One Page"), "One Page", crate::widgets::ButtonAction::new("view.onePage", json!({}), v.fit == "onePage"));
             small(
@@ -75,22 +70,6 @@ pub(super) fn view(app: &mut WordApp, ui: &mut Ui) {
                 crate::widgets::ButtonAction::new("view.pageWidth", json!({}), v.fit == "pageWidth"),
             );
         });
-    });
-    group(ui, "Dark Mode", None, app, |ui, app| {
-        big(ui, app, "darkMode", "Switch\nModes", "view.darkMode", json!({}), false);
-        menu_button(
-            ui,
-            app,
-            crate::widgets::MenuButtonOptions::new("interfaceTheme", Some("Interface\nTheme"), "Interface Theme", true, ""),
-            |ui, app| {
-                for a in crate::theme::Appearance::ALL {
-                    if ui.add(egui::Button::selectable(app.ui.theme == a, tl!(a.label())).min_size(vec2(200.0, 0.0))).clicked() {
-                        let _ = app.run("view.interfaceTheme", json!({"value": a.code()}));
-                        ui.close();
-                    }
-                }
-            },
-        );
     });
     group(ui, "Window", None, app, |ui, app| {
         big(ui, app, "newWindow", "New\nWindow", "view.newWindow", json!({}), false);
@@ -132,6 +111,23 @@ pub(super) fn view(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Templates", None, app, |ui, app| {
         big(ui, app, "documentTemplate", "Templates", "tools.templates", json!({}), false);
+    });
+    // Type and Writer extras after Word's own groups.
+    group(ui, "Dark Mode", None, app, |ui, app| {
+        big(ui, app, "darkMode", "Switch\nModes", "view.darkMode", json!({}), false);
+        menu_button(
+            ui,
+            app,
+            crate::widgets::MenuButtonOptions::new("interfaceTheme", Some("Interface\nTheme"), "Interface Theme", true, ""),
+            |ui, app| {
+                for a in crate::theme::Appearance::ALL {
+                    if ui.add(egui::Button::selectable(app.ui.theme == a, tl!(a.label())).min_size(vec2(200.0, 0.0))).clicked() {
+                        let _ = app.run("view.interfaceTheme", json!({"value": a.code()}));
+                        ui.close();
+                    }
+                }
+            },
+        );
     });
 }
 
